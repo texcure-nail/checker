@@ -136,7 +136,8 @@
       <summary><b>そのほか</b></summary>
       <div class="row"><label><input type="checkbox" id="showImg" checked> 見本の絵を重ねる</label></div>
       <div class="row"><label><input type="checkbox" id="matoOn" checked> 纏のひとことを出す</label></div>
-      <div class="row"><button class="btn plain" id="resetPos">位置と大きさをリセット</button></div>
+      <p class="note">見本・位置・大きさ・わく・カーブは自動で保存されて、次に開くと続きから始まります（この端末の中だけ）。</p>
+      <div class="row"><button class="btn plain" id="resetPos">位置と大きさをリセット</button><button class="btn plain" id="wipe">ぜんぶ消して最初から</button></div>
     </details>
     <div class="panel"><b>カーブの使い方</b>
       <p class="note">「カーブ」をオンにして、ゆるめ・ふつう・きつめから選んでね。分からなければ上の「カーブをはかる」で写真から判定できるよ。そのあと動かすものを「点線」にして、点線2本をチップの左右の端に合わせると、端っこほど詰めて出ます（目安）。</p></div>
@@ -210,10 +211,10 @@ $('c1').addEventListener('pointermove',e=>{if(!drag1)return;const q=local1(pos($
 $('tilt').addEventListener('input',()=>{draw1();draw2();});
 function rot90(src){const w=src.width||src.videoWidth,h=src.height||src.videoHeight,c=document.createElement('canvas');c.width=h;c.height=w;
   const x=c.getContext('2d');x.translate(h/2,w/2);x.rotate(Math.PI/2);x.drawImage(src,-w/2,-h/2);return c;}
-$('rotRef').onclick=()=>{if(ref.img){ref.img=rot90(ref.img);draw1();draw2();}};
+$('rotRef').onclick=()=>{if(ref.img){ref.rot=((ref.rot||0)+1)%4;saveSoon();ref.img=rot90(ref.img);draw1();draw2();}};
 document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('change',()=>draw2()));
 const end1=()=>{drag1=null;};$('c1').addEventListener('pointerup',end1);$('c1').addEventListener('pointercancel',end1);
-$('fRef').onchange=e=>loadImg(e.target.files[0],im=>{ref.img=im;chip.g=null;draw1();draw2();mato('ref');});
+$('fRef').onchange=e=>loadImg(e.target.files[0],im=>{ref.img=im;ref.file=e.target.files[0];ref.rot=0;chip.g=null;saveSoon();draw1();draw2();mato('ref');});
 $('resetLines').onclick=()=>{resetLines();draw1();draw2();};
 
 /* ---------- ② チップ ---------- */
@@ -286,7 +287,7 @@ $('c2').addEventListener('pointermove',e=>{if(chip.tracing){if(chip.tr){const q=
   else if(pts.size===2&&gPrev){const g=two(),k=g.d/Math.max(1,gPrev.d);let da=g.a-gPrev.a;if(da>Math.PI)da-=2*Math.PI;if(da<-Math.PI)da+=2*Math.PI;
     const v=rot(L.x+ox-gPrev.mx,L.y+oy-gPrev.my,da);L.x=g.mx+v[0]*k-ox;L.y=g.my+v[1]*k-oy;L.s=Math.max(0.1,Math.min(12,L.s*k));L.r+=da;gPrev=g;}
   draw2();});
-const end2=e=>{if(chip.tracing){finishTrace();return;}pts.delete(e.pointerId);edgeDrag=null;gPrev=pts.size===2?two():null;};
+const end2=e=>{saveSoon();if(chip.tracing){finishTrace();return;}pts.delete(e.pointerId);edgeDrag=null;gPrev=pts.size===2?two():null;};
 $('c2').addEventListener('pointerup',end2);$('c2').addEventListener('pointercancel',end2);
 $('ga').addEventListener('input',draw2);$('showImg').onchange=draw2;
 $('bend').addEventListener('input',()=>{drawMoon();draw2();});
@@ -329,6 +330,7 @@ const MATO={intro1:['egao','下書き、いっしょに見よっか。……え�
   live:[['bikkuri','わ、映ってる映ってる！'],['egao','見てるから、ゆっくり描いてね']],
   frame:[['egao','その形、覚えたよ'],['tere','君のチップの形だね。……いいな']],
   saved:[['egao','覚えたよ。次も、すぐ出すね']],
+  resume:[['egao','続きからだよ。……えへへ、ちゃんと取っておいた'],['tere','おかえり。昨日のまま、待ってたよ']],
   curveHard:[['bikkuri','えっ、けっこうカーブあるね']],curveSoft:[['egao','このくらいのカーブなら、描きやすそう']],
   undo:[['egao','だいじょうぶ、戻したよ'],['tere','えへへ、僕もよくやる']]};
 let matoT=null;const matoLast={};
@@ -340,7 +342,6 @@ function mato(key,gap){if(!$('matoOn').checked)return;const now=Date.now();if(ma
   clearTimeout(matoT);matoT=setTimeout(()=>{el.classList.add('off');setTimeout(()=>{el.hidden=true;},400);},3200);}
 $('matoOn').checked=getLS('texcure_mato')!=='off';$('matoOn').onchange=()=>setLS('texcure_mato',$('matoOn').checked?'on':'off');
 if(!getLS('texcure_seen')){$('introSay').textContent=MATO.intro1[1];$('intro').hidden=false;}
-else setTimeout(()=>mato('back'),500);
 $('introGo').onclick=()=>{$('intro').hidden=true;setLS('texcure_seen','1');};
 /* 1つ戻る */
 const hist=[];
@@ -360,12 +361,12 @@ function setChip(im){const wasLive=chip.live,old=chip.src;stopLive();const first
   if(!first&&!wasLive){if(!chip.prev)chip.backMode=mode()==='photo'?'guide':mode();chip.prev={src:old,p:{...chip.p}};setMode('photo');$('ghostMsg').hidden=false;}
   chip.src=im;if(first){chip.p={x:0,y:0,s:1,r:0};mato('chip');}draw2();}
 $('ghostDone').onclick=()=>{endGhost();mato('aligned',4000);};$('more').addEventListener('toggle',()=>draw2());
-$('fChip').onchange=e=>loadImg(e.target.files[0],setChip);$('fChip2').onchange=e=>loadImg(e.target.files[0],setChip);
+const pickChip=e=>{const f=e.target.files[0];loadImg(f,im=>{setChip(im);chip.file=f;saveSoon();});};$('fChip').onchange=pickChip;$('fChip2').onchange=pickChip;
 $('live').onclick=async()=>{const msg=$('liveMsg');
   if(chip.live){stopLive();draw2();return;}
   try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('no');
     const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:3840},height:{ideal:2160}},audio:false});
-    endGhost();const v=$('vid');v.srcObject=st;await v.play();if(!chip.src)chip.p={x:0,y:0,s:1,r:0};chip.src=v;chip.live=true;msg.hidden=true;$('live').textContent='■ 止める';mato('live');
+    endGhost();const v=$('vid');v.srcObject=st;await v.play();if(!chip.src)chip.p={x:0,y:0,s:1,r:0};chip.src=v;chip.live=true;msg.hidden=true;chip.file=null;$('live').textContent='■ 止める';mato('live');
     try{const tr=st.getVideoTracks()[0],cap=tr.getCapabilities?tr.getCapabilities():{};chip.track=tr;
       if(cap.zoom&&cap.zoom.max>cap.zoom.min){const z=$('zoom'),mx=Math.min(cap.zoom.max,8);z.min=cap.zoom.min;z.max=mx;z.step=cap.zoom.step||0.1;z.value=Math.min(mx,Math.max(cap.zoom.min,2));
         $('zoomRow').hidden=false;tr.applyConstraints({advanced:[{zoom:+z.value}]}).catch(()=>{});}}catch(e){}
@@ -419,7 +420,32 @@ function show(n){[1,2,3].forEach(i=>{$('s'+i).hidden=n!==i;$('tab'+i).setAttribu
   n===1?draw1():n===2?draw2():draw3();}
 $('tab1').onclick=()=>show(1);$('tab2').onclick=()=>show(2);$('tab3').onclick=()=>show(3);$('go2').onclick=()=>{show(2);window.scrollTo(0,0);};
 window.addEventListener('resize',()=>{draw1();draw2();draw3();});
+/* つづきを自動で保存 */
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('texcure_checker',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function kvSet(k,v){try{const d=await idb();await new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);});return true;}catch(e){return false;}}
+async function kvGet(k){try{const d=await idb();return await new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});}catch(e){return null;}}
+let ready=false,saveT=null,savedRef=null,savedChip=null;
+function saveSoon(){if(!ready)return;clearTimeout(saveT);saveT=setTimeout(saveNow,500);}
+async function saveNow(){const st={w:$('c2').clientWidth,g:chip.g,f:chip.f,p:chip.p,eL:chip.eL,eR:chip.eR,custom:chip.custom||null,shape:$('shape').value,slim:$('slim').value,
+    frameOn:$('frameOn').checked,curveOn:$('curveOn').checked,bend:$('bend').value,ga:$('ga').value,showImg:$('showImg').checked,rot:ref.rot||0,hasRef:!!ref.file,hasChip:!!chip.file,t:Date.now()};
+  await kvSet('state',st);
+  if(ref.file&&ref.file!==savedRef){if(await kvSet('ref',ref.file))savedRef=ref.file;}
+  if(chip.file&&chip.file!==savedChip){if(await kvSet('chip',chip.file))savedChip=chip.file;}}
+const blobImg=b=>new Promise(res=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>res(null);im.src=URL.createObjectURL(b);});
+async function restore(){const st=await kvGet('state');if(!st||!st.hasRef)return false;const rb=await kvGet('ref');if(!rb)return false;let im=await blobImg(rb);if(!im)return false;
+  for(let i=0;i<(st.rot||0);i++)im=rot90(im);ref.img=im;ref.file=rb;ref.rot=st.rot||0;savedRef=rb;
+  if(st.hasChip){const cb=await kvGet('chip');const ci=cb&&await blobImg(cb);if(ci){chip.src=ci;chip.file=cb;savedChip=cb;}}
+  const k=($('c2').clientWidth||st.w)/(st.w||1),sc=o=>o?{...o,x:o.x*k,y:o.y*k}:o;
+  chip.g=sc(st.g);chip.f=sc(st.f);chip.p=sc(st.p)||chip.p;chip.eL=st.eL;chip.eR=st.eR;chip.custom=st.custom;
+  $('shape').value=st.shape;$('slim').value=st.slim;$('bend').value=st.bend;$('ga').value=st.ga;$('showImg').checked=st.showImg!==false;
+  const fo=!!st.frameOn;$('frameOn').checked=fo;$('shape').disabled=$('slim').disabled=!fo;$('frameTab').hidden=!fo;$('traceRow').hidden=!fo;
+  const co=!!st.curveOn;$('curveOn').checked=co;document.querySelectorAll('.pre').forEach(b=>b.disabled=!co);$('fineRow').hidden=!co;$('edgeTab').hidden=!co;setLock(true);markPre();drawMoon();
+  draw1();draw2();return true;}
+document.addEventListener('input',saveSoon);document.addEventListener('change',saveSoon);document.addEventListener('click',saveSoon);
+{let armed=false;$('wipe').onclick=async()=>{if(!armed){armed=true;$('wipe').textContent='本当に消す？ もう一度押す';setTimeout(()=>{armed=false;$('wipe').textContent='ぜんぶ消して最初から';},4000);return;}
+  ready=false;clearTimeout(saveT);await kvSet('state',null);await kvSet('ref',null);await kvSet('chip',null);location.reload();};}
 drawMoon();draw2();
+restore().then(ok=>{ready=true;if(getLS('texcure_seen'))setTimeout(()=>mato(ok?'resume':'back'),400);});
 </script>
 </body>
 </html>
