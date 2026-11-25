@@ -88,12 +88,15 @@
   <section id="s2">
     <div class="row top">
       <label class="btn mint" for="fRef">① 見本</label>
-      <label class="btn"><input type="file" id="fChip" accept="image/*" capture="environment">② チップを撮る</label>
+      <label class="btn"><input type="file" id="fChip" accept="image/*" capture="environment">② 撮る</label>
       <label class="btn plain"><input type="file" id="fChip2" accept="image/*">アルバム</label>
+      <button class="btn yel" id="live">🎥 ライブ</button>
     </div>
+    <div class="msg" id="liveMsg" hidden></div>
     <div class="stage"><canvas id="c2"></canvas></div>
     <div class="bar" id="bar">
       <div class="msg" id="ghostMsg" hidden>うすいのが前の写真。新しい写真を指で重ねてね <button class="btn mint sm" id="ghostDone">合わせた！</button></div>
+      <div class="row tight" id="zoomRow" hidden style="margin:0 0 8px"><span class="mini">カメラのズーム</span><input type="range" id="zoom"></div>
       <div class="seg">
         <label><input type="radio" name="mode" value="guide" checked><span>見本</span></label>
         <label><input type="radio" name="mode" value="photo"><span>チップ</span></label>
@@ -122,8 +125,7 @@
     <details class="panel">
       <summary><b>そのほか</b></summary>
       <div class="row"><label><input type="checkbox" id="showImg" checked> 見本の絵を重ねる</label></div>
-      <div class="row"><button class="btn plain" id="resetPos">位置と大きさをリセット</button><button class="btn yel" id="live">ライブで映す</button></div>
-      <div class="msg" id="liveMsg" hidden></div>
+      <div class="row"><button class="btn plain" id="resetPos">位置と大きさをリセット</button></div>
     </details>
     <div class="panel"><b>カーブの使い方</b>
       <p class="note">「カーブ」をオンにして、ゆるめ・ふつう・きつめから選んでね。分からなければ上の「カーブをはかる」で写真から判定できるよ。そのあと動かすものを「点線」にして、点線2本をチップの左右の端に合わせると、端っこほど詰めて出ます（目安）。</p></div>
@@ -313,7 +315,9 @@ $('resetPos').onclick=()=>{snap();chip.g=null;chip.f=null;chip.p={x:0,y:0,s:1,r:
 $('frameOn').onchange=()=>{const on=$('frameOn').checked;$('traceRow').hidden=!on;if(!on)setTrace(false);$('shape').disabled=$('slim').disabled=!on;$('frameTab').hidden=!on;
   document.querySelector('input[name=mode][value='+(on?'frame':'guide')+']').checked=true;draw2();};
 $('shape').onchange=draw2;$('slim').addEventListener('input',draw2);
-function stopLive(){if(chip.live&&chip.src&&chip.src.srcObject){chip.src.srcObject.getTracks().forEach(t=>t.stop());}chip.live=false;}
+function stopLive(){if(chip.live&&chip.src&&chip.src.srcObject){const v=chip.src,c=document.createElement('canvas');c.width=v.videoWidth||2;c.height=v.videoHeight||2;
+    try{c.getContext('2d').drawImage(v,0,0);}catch(e){}v.srcObject.getTracks().forEach(t=>t.stop());v.srcObject=null;chip.src=c;}
+  chip.live=false;chip.track=null;$('live').textContent='🎥 ライブ';$('zoomRow').hidden=true;}
 const setMode=v=>{document.querySelector('input[name=mode][value='+v+']').checked=true;};
 function endGhost(){if(!chip.prev)return;chip.prev=null;$('ghostMsg').hidden=true;setMode(chip.backMode||'guide');draw2();}
 function setChip(im){const wasLive=chip.live,old=chip.src;stopLive();const first=!old;if(!first)snap();
@@ -322,10 +326,16 @@ function setChip(im){const wasLive=chip.live,old=chip.src;stopLive();const first
 $('ghostDone').onclick=endGhost;$('more').addEventListener('toggle',()=>draw2());
 $('fChip').onchange=e=>loadImg(e.target.files[0],setChip);$('fChip2').onchange=e=>loadImg(e.target.files[0],setChip);
 $('live').onclick=async()=>{const msg=$('liveMsg');
+  if(chip.live){stopLive();draw2();return;}
   try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('no');
-    const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920}},audio:false});
-    stopLive();const v=$('vid');v.srcObject=st;await v.play();chip.src=v;chip.live=true;chip.p={x:0,y:0,s:1,r:0};msg.hidden=true;loop();}
-  catch(err){msg.hidden=false;msg.textContent='この画面ではライブのカメラが使えないみたい。「チップを撮る」で写真を撮って重ねてね。';}};
+    const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:3840},height:{ideal:2160}},audio:false});
+    endGhost();const v=$('vid');v.srcObject=st;await v.play();if(!chip.src)chip.p={x:0,y:0,s:1,r:0};chip.src=v;chip.live=true;msg.hidden=true;$('live').textContent='■ 止める';
+    try{const tr=st.getVideoTracks()[0],cap=tr.getCapabilities?tr.getCapabilities():{};chip.track=tr;
+      if(cap.zoom&&cap.zoom.max>cap.zoom.min){const z=$('zoom'),mx=Math.min(cap.zoom.max,8);z.min=cap.zoom.min;z.max=mx;z.step=cap.zoom.step||0.1;z.value=Math.min(mx,Math.max(cap.zoom.min,2));
+        $('zoomRow').hidden=false;tr.applyConstraints({advanced:[{zoom:+z.value}]}).catch(()=>{});}}catch(e){}
+    draw2();loop();}
+  catch(err){msg.hidden=false;msg.textContent='この画面ではライブのカメラが使えないみたい。「② 撮る」で写真を撮って重ねてね。';}};
+$('zoom').addEventListener('input',()=>{if(chip.track)chip.track.applyConstraints({advanced:[{zoom:+$('zoom').value}]}).catch(()=>{});});
 function loop(){if(!chip.live)return;if(!$('s2').hidden)draw2();requestAnimationFrame(loop);}
 
 /* ---------- カーブをはかる ---------- */
