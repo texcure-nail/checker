@@ -47,7 +47,17 @@
   .stage{padding:6px}.bar{margin-top:8px;padding:8px 10px 6px}
   #more summary{padding:8px 0 2px;cursor:pointer}
   .msg{margin:0 0 8px}
+  #intro{position:fixed;inset:0;z-index:50;background:rgba(40,30,80,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+  .icard{background:#fff;border-radius:26px;padding:18px 18px 20px;max-width:340px;width:100%;text-align:center;box-shadow:8px 8px 0 var(--lav2)}
+  .icard img{width:200px;max-width:70%;border-radius:20px;background:var(--mint)}
+  .icard .who{font-size:12px;font-weight:700;opacity:.7;margin:8px 0 2px}.icard .say{font-size:17px;font-weight:700;margin:0 0 14px;line-height:1.7}
+  .icard .btn{width:100%;font-size:16px;padding:13px}
+  #mato{position:fixed;left:10px;right:10px;top:10px;z-index:40;display:flex;align-items:center;gap:10px;background:#fff;border-radius:999px;padding:6px 16px 6px 6px;box-shadow:0 6px 18px rgba(70,58,120,.28);border:3px solid var(--mint);pointer-events:none;transition:opacity .35s,transform .35s}
+  #mato.off{opacity:0;transform:translateY(-16px)}
+  #mato img{width:54px;height:54px;border-radius:50%;object-fit:cover;object-position:50% 38%;background:var(--mint);flex:none}
+  #mato p{margin:0;font-weight:700;font-size:14px;line-height:1.45}
   h1 small{font-size:12px;font-weight:700;opacity:.7}
+  .story{display:flex;gap:12px;align-items:center;margin-bottom:14px;padding-bottom:14px;border-bottom:2px dashed var(--lav2)}.story img{width:84px;height:84px;border-radius:18px;object-fit:cover;object-position:50% 30%;background:var(--mint);flex:none}
   footer{margin:8px 12px 40px;padding:14px;border-radius:18px;background:#fff;font-size:13px}footer a{color:#1f9d8b;font-weight:700}
   input[type=text]{flex:1;min-width:0;padding:9px;border-radius:10px;border:2px solid var(--lav2);font-size:15px;color:var(--ink);font-family:inherit}
   .chips .set{display:inline-flex;align-items:center;gap:2px;padding:0;background:none}.chips .set button{border:0;font-family:inherit;font-weight:700;color:var(--ink);font-size:13px;padding:8px 12px;background:var(--yel);border-radius:999px 0 0 999px}.chips .set button.del{background:var(--lav);border-radius:0 999px 999px 0;padding:8px 10px}
@@ -125,6 +135,7 @@
     <details class="panel">
       <summary><b>そのほか</b></summary>
       <div class="row"><label><input type="checkbox" id="showImg" checked> 見本の絵を重ねる</label></div>
+      <div class="row"><label><input type="checkbox" id="matoOn" checked> 纏のひとことを出す</label></div>
       <div class="row"><button class="btn plain" id="resetPos">位置と大きさをリセット</button></div>
     </details>
     <div class="panel"><b>カーブの使い方</b>
@@ -143,9 +154,12 @@
     </div>
   </section>
 </main>
-<footer>見本をチップにうすく重ねて、目の位置や顔の幅を答え合わせするページです。写真はこの端末の中だけで使い、どこにも送りません。<br><br><b>つくった人：teXcure（てくすきゅあ）</b><br>ジェルネイルの質感を擬人化した、6人のキャラクターのネイルIP。<br>
+<footer><div class="story"><img src="a/matoi_tere.webp" alt=""><div><b>纏って、だれ？</b><br>ネイルに宿る6人のお話、タップで読めます。<br><a href="https://claude.ai/artifact/UEKWJ4B7Rkd1gFPV5oCRuB#no_universal_links">▶ 纏のお話を読む</a></div></div>見本をチップにうすく重ねて、目の位置や顔の幅を答え合わせするページです。写真はこの端末の中だけで使い、どこにも送りません。<br><br><b>つくった人：teXcure（てくすきゅあ）</b><br>ジェルネイルの質感を擬人化した、6人のキャラクターのネイルIP。<br>
 <a href="https://www.instagram.com/texcure_nail/">Instagram @texcure_nail</a>（痛ネイル上達日記もここで更新中）</footer>
 <video id="vid" playsinline muted></video>
+<div id="intro" hidden><div class="icard"><img id="introImg" src="a/matoi_egao.webp" alt="纏"><p class="who">カラージェルの子・纏（まと）</p><p class="say" id="introSay"></p>
+  <button class="btn mint" id="introGo">はじめる</button></div></div>
+<div id="mato" hidden><img id="matoImg" alt="" src="a/matoi_egao.webp"><p id="matoSay"></p></div>
 
 <script>
 const $=id=>document.getElementById(id);
@@ -199,7 +213,7 @@ function rot90(src){const w=src.width||src.videoWidth,h=src.height||src.videoHei
 $('rotRef').onclick=()=>{if(ref.img){ref.img=rot90(ref.img);draw1();draw2();}};
 document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('change',()=>draw2()));
 const end1=()=>{drag1=null;};$('c1').addEventListener('pointerup',end1);$('c1').addEventListener('pointercancel',end1);
-$('fRef').onchange=e=>loadImg(e.target.files[0],im=>{ref.img=im;chip.g=null;draw1();draw2();});
+$('fRef').onchange=e=>loadImg(e.target.files[0],im=>{ref.img=im;chip.g=null;draw1();draw2();mato('ref');});
 $('resetLines').onclick=()=>{resetLines();draw1();draw2();};
 
 /* ---------- ② チップ ---------- */
@@ -292,7 +306,7 @@ function finishTrace(){const T=chip.tr,w=$('c2').clientWidth;if(!T||T.length<12)
   const xs=T.map(q=>q[0]),ys=T.map(q=>q[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys),bw=x1-x0;
   if(bw<24||y1-y0<24){chip.tr=null;draw2();return;}
   const cx=(x0+x1)/2,cy=(y0+y1)/2,st=Math.max(1,T.length/48),P=[];for(let i=0;i<T.length;i+=st){const q=T[Math.floor(i)];P.push([+((q[0]-cx)/bw).toFixed(4),+((q[1]-cy)/bw).toFixed(4)]);}
-  snap();chip.custom=P;$('shape').value='custom';chip.f={x:cx,y:cy,s:bw/(w*0.36),r:0};setTrace(false);draw2();}
+  snap();chip.custom=P;$('shape').value='custom';chip.f={x:cx,y:cy,s:bw/(w*0.36),r:0};setTrace(false);draw2();mato('frame',4000);}
 /* マイチップ */
 const KEY='texcure_chips';
 function loadSets(){try{return JSON.parse(localStorage.getItem(KEY))||[];}catch(e){return [];}}
@@ -304,12 +318,34 @@ function applySet(t){$('more').open=true;$('frameOn').checked=true;$('frameOn').
   $('curveOn').checked=!!t.curveOn;$('curveOn').onchange();$('bend').value=t.bend;markPre();drawMoon();draw2();$('setMsg').textContent='「'+t.name+'」を読みこんだよ。「わく」をチップに合わせてね。';}
 $('setSave').onclick=()=>{const name=$('setName').value.trim();if(!name){$('setMsg').textContent='名前を入れてね。';return;}
   const A=loadSets().filter(t=>t.name!==name);A.push({name,shape:$('shape').value,slim:$('slim').value,custom:$('shape').value==='custom'?chip.custom:null,bend:$('bend').value,curveOn:$('curveOn').checked});
-  $('setMsg').textContent=saveSets(A)?'「'+name+'」を保存したよ。':'この画面では保存できなかった…。';$('setName').value='';renderSets();};
+  $('setMsg').textContent=saveSets(A)?'「'+name+'」を保存したよ。':'この画面では保存できなかった…。';$('setName').value='';renderSets();mato('saved',4000);};
 renderSets();
+/* 纏 */
+const MATO={intro1:['egao','下書き、いっしょに見よっか。……えへへ、僕も見たい'],
+  back:[['egao','おかえり。……えへへ、今日も描くんだね'],['tere','来てくれたんだ。……うれしいな'],['egao','……ね、今日はどこから描く？']],
+  ref:[['egao','わ、この絵にするんだ。……いいね'],['tere','……ね、どこを切りとる？　僕も見てる']],
+  chip:[['egao','撮れたね。じゃあ、重ねてみよっか'],['egao','うん、いい感じに映ってるよ']],
+  aligned:[['egao','ぴったり。……えへへ、じょうずだね'],['tere','そこ、さっきよりよくなってる。ほんとだよ']],
+  live:[['bikkuri','わ、映ってる映ってる！'],['egao','見てるから、ゆっくり描いてね']],
+  frame:[['egao','その形、覚えたよ'],['tere','君のチップの形だね。……いいな']],
+  saved:[['egao','覚えたよ。次も、すぐ出すね']],
+  curveHard:[['bikkuri','えっ、けっこうカーブあるね']],curveSoft:[['egao','このくらいのカーブなら、描きやすそう']],
+  undo:[['egao','だいじょうぶ、戻したよ'],['tere','えへへ、僕もよくやる']]};
+let matoT=null;const matoLast={};
+function getLS(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function setLS(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function mato(key,gap){if(!$('matoOn').checked)return;const now=Date.now();if(matoLast[key]&&now-matoLast[key]<(gap||20000))return;matoLast[key]=now;
+  const L=MATO[key],[f,t]=L[Math.floor(Math.random()*L.length)];$('matoImg').src='a/matoi_'+f+'.webp';$('matoSay').textContent=t;
+  const el=$('mato');el.hidden=false;el.classList.add('off');requestAnimationFrame(()=>el.classList.remove('off'));
+  clearTimeout(matoT);matoT=setTimeout(()=>{el.classList.add('off');setTimeout(()=>{el.hidden=true;},400);},3200);}
+$('matoOn').checked=getLS('texcure_mato')!=='off';$('matoOn').onchange=()=>setLS('texcure_mato',$('matoOn').checked?'on':'off');
+if(!getLS('texcure_seen')){$('introSay').textContent=MATO.intro1[1];$('intro').hidden=false;}
+else setTimeout(()=>mato('back'),500);
+$('introGo').onclick=()=>{$('intro').hidden=true;setLS('texcure_seen','1');};
 /* 1つ戻る */
 const hist=[];
 function snap(){if(!chip.g)return;hist.push(JSON.stringify({g:chip.g,f:chip.f,p:chip.p,eL:chip.eL,eR:chip.eR}));if(hist.length>30)hist.shift();$('undo').disabled=false;}
-$('undo').onclick=()=>{const t=hist.pop();if(!t)return;Object.assign(chip,JSON.parse(t));$('undo').disabled=!hist.length;draw2();};
+$('undo').onclick=()=>{const t=hist.pop();if(!t)return;Object.assign(chip,JSON.parse(t));$('undo').disabled=!hist.length;draw2();mato('undo',60000);};
 $('rot90').onclick=()=>{const L=layer();if(L&&mode()!=='edge'){snap();L.r+=Math.PI/2;draw2();}};
 $('resetPos').onclick=()=>{snap();chip.g=null;chip.f=null;chip.p={x:0,y:0,s:1,r:0};draw2();};
 $('frameOn').onchange=()=>{const on=$('frameOn').checked;$('traceRow').hidden=!on;if(!on)setTrace(false);$('shape').disabled=$('slim').disabled=!on;$('frameTab').hidden=!on;
@@ -322,14 +358,14 @@ const setMode=v=>{document.querySelector('input[name=mode][value='+v+']').checke
 function endGhost(){if(!chip.prev)return;chip.prev=null;$('ghostMsg').hidden=true;setMode(chip.backMode||'guide');draw2();}
 function setChip(im){const wasLive=chip.live,old=chip.src;stopLive();const first=!old;if(!first)snap();
   if(!first&&!wasLive){if(!chip.prev)chip.backMode=mode()==='photo'?'guide':mode();chip.prev={src:old,p:{...chip.p}};setMode('photo');$('ghostMsg').hidden=false;}
-  chip.src=im;if(first)chip.p={x:0,y:0,s:1,r:0};draw2();}
-$('ghostDone').onclick=endGhost;$('more').addEventListener('toggle',()=>draw2());
+  chip.src=im;if(first){chip.p={x:0,y:0,s:1,r:0};mato('chip');}draw2();}
+$('ghostDone').onclick=()=>{endGhost();mato('aligned',4000);};$('more').addEventListener('toggle',()=>draw2());
 $('fChip').onchange=e=>loadImg(e.target.files[0],setChip);$('fChip2').onchange=e=>loadImg(e.target.files[0],setChip);
 $('live').onclick=async()=>{const msg=$('liveMsg');
   if(chip.live){stopLive();draw2();return;}
   try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('no');
     const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:3840},height:{ideal:2160}},audio:false});
-    endGhost();const v=$('vid');v.srcObject=st;await v.play();if(!chip.src)chip.p={x:0,y:0,s:1,r:0};chip.src=v;chip.live=true;msg.hidden=true;$('live').textContent='■ 止める';
+    endGhost();const v=$('vid');v.srcObject=st;await v.play();if(!chip.src)chip.p={x:0,y:0,s:1,r:0};chip.src=v;chip.live=true;msg.hidden=true;$('live').textContent='■ 止める';mato('live');
     try{const tr=st.getVideoTracks()[0],cap=tr.getCapabilities?tr.getCapabilities():{};chip.track=tr;
       if(cap.zoom&&cap.zoom.max>cap.zoom.min){const z=$('zoom'),mx=Math.min(cap.zoom.max,8);z.min=cap.zoom.min;z.max=mx;z.step=cap.zoom.step||0.1;z.value=Math.min(mx,Math.max(cap.zoom.min,2));
         $('zoomRow').hidden=false;tr.applyConstraints({advanced:[{zoom:+z.value}]}).catch(()=>{});}}catch(e){}
@@ -376,7 +412,7 @@ $('c3').addEventListener('pointermove',e=>{if(!mp.has(e.pointerId))return;const 
 const mEnd=e=>{mp.delete(e.pointerId);mDrag=null;mPrev=mp.size===2?mTwo():null;};$('c3').addEventListener('pointerup',mEnd);$('c3').addEventListener('pointercancel',mEnd);
 const setMoon=im=>{M.img=im;M.vx=M.vy=0;M.s=1;M.P=null;draw3();};
 $('fMoon').onchange=e=>loadImg(e.target.files[0],setMoon);$('fMoon2').onchange=e=>loadImg(e.target.files[0],setMoon);
-$('useMoon').onclick=()=>{if(M.deg===null)return;$('more').open=true;$('bend').value=M.deg;$('curveOn').checked=true;$('curveOn').onchange();show(2);window.scrollTo(0,0);};
+$('useMoon').onclick=()=>{if(M.deg===null)return;mato(M.deg>53?'curveHard':'curveSoft',4000);$('more').open=true;$('bend').value=M.deg;$('curveOn').checked=true;$('curveOn').onchange();show(2);window.scrollTo(0,0);};
 
 /* ---------- タブ ---------- */
 function show(n){[1,2,3].forEach(i=>{$('s'+i).hidden=n!==i;$('tab'+i).setAttribute('aria-selected',n===i);});
